@@ -77,6 +77,17 @@ Eigen::Matrix4d transformation_matrix(const Eigen::Matrix3d &r, const Eigen::Vec
 
     return matrix;
 }
+
+Eigen::Matrix3d skew_symmetric(Eigen::Vector3d v) {
+    Eigen::Matrix3d skew_symetric_matrix;
+
+    skew_symetric_matrix <<
+        0, -v(2), v(1),
+    v(2), 0, -v(0),
+    -v(1), v(0), 0;
+
+    return skew_symetric_matrix;
+}
 // =================================================================
 
 
@@ -210,6 +221,31 @@ void wrench(Eigen::Vector3d fw, Eigen::Vector3d ms, Eigen::Vector3d ews) {
 }
 // ==============================================================
 
+
+// Task 3 a)
+// ==============================================================
+Eigen::Matrix3d matrix_exponential(const Eigen::Vector3d &w, double theta) {
+    Eigen::Matrix3d I;
+
+    I << 1, 0, 0,
+    0, 1, 0,
+    0, 0, 1;
+
+    return I + std::sin(theta)*skew_symmetric(w) + (1 - std::cos(theta))*skew_symmetric(w)*skew_symmetric(w);
+}
+// ==============================================================
+
+
+// Task 3 b)
+// ==============================================================
+std::pair<Eigen::Vector3d, double> matrix_logarithm(const Eigen::Matrix3d &r) {
+    double theta = 0;
+    Eigen::Vector3d w = Eigen::Vector3d::Zero();
+
+    
+}
+// ==============================================================
+
 int main() {
     // 1 a)
     // ==============================================================
@@ -264,14 +300,12 @@ int main() {
 
     // Task 2 b)
     // ==============================================================
-    float N = 0;
-
     Eigen::VectorXd Fh(6);
     Eigen::VectorXd Fa(6);
-    Eigen::Vector3d wa{0, 0, 0};
-    Eigen::Vector3d va{-5, N, 0};
     Eigen::Vector3d wh{0, 0, 0};
-    Eigen::Vector3d vh{0, -1, N};
+    Eigen::Vector3d vh{0, -5, 0};
+    Eigen::Vector3d wa{0, 0, 0};
+    Eigen::Vector3d va{0, 0, 1};
     Eigen::VectorXd Ff(6);
     Eigen::MatrixXd Thf(4, 4);
     Eigen::MatrixXd Taf(4, 4);
@@ -294,8 +328,6 @@ int main() {
     Ff = adjoint_matrix(Thf).transpose()*Fh + adjoint_matrix(Taf).transpose()*Fa;
 
     std::cout << Ff.transpose() << std::endl;
-
-
     // ==============================================================
 
 
