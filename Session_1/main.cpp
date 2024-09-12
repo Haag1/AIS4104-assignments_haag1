@@ -87,6 +87,7 @@ Eigen::Vector3d euler_zyx_from_rotation(const Eigen::Matrix3d &r) {
     double a;
     double b;
     double c;
+
     if(floatEquals(r(2, 0), -1.0)){
         b = EIGEN_PI / 2.0;
         a = 0;
@@ -132,8 +133,6 @@ Eigen::VectorXd screw_axis(const Eigen::Vector3d &q, const Eigen::Vector3d &s, d
     screwAxis = screwAxis.transpose();
 
     return screwAxis;
-
-
 }
 // =================================================================
 
@@ -187,32 +186,27 @@ double cot(double x) {
 
 // Task 2 a)
 // ==============================================================
-void wrench() {
-    Eigen::VectorXd F_s(6);
-    Eigen::Matrix3d R_ws;
-    Eigen::Vector3d p_ws;
-    Eigen::Matrix4d T_ws;
-    Eigen::MatrixXd Ad_T_ws(6, 6);
-    Eigen::VectorXd F_w(6);
-    Eigen::Vector3d e_ws;
+void wrench(Eigen::Vector3d fw, Eigen::Vector3d ms, Eigen::Vector3d ews) {
+    // print variables
+    Eigen::VectorXd wrench_w(6);
+    Eigen::VectorXd wrench_s(6);
 
+    // Equation variables
+    Eigen::Vector3d fs;
+    Eigen::Vector3d mw;
+    Eigen::Matrix3d Rws;
 
-    // Fra oppgaven
-    F_w << 0, 0, 0, -30, 0, 0;
-    e_ws << -60, 60, 0;
+    // fw = rws * fs
+    // fs = rws^-1 * fw
+    Rws = rotation_matrix_from_euler_zyx(ews * deg_to_rad_const);
+    fs = Rws * fw;
+    wrench_s << ms(0), ms(1), ms(2), fs(0), fs(1), fs(2);
 
-    // Definerer p og R for å finne T
-    p_ws << 0, 0, -1/15;
-    R_ws = rotation_matrix_from_euler_zyx(e_ws * deg_to_rad_const);
-    T_ws = transformation_matrix(R_ws, p_ws);
+    mw = Rws.transpose() * ms;
+    wrench_w << mw(0), mw(1), mw(2), fw(0), fw(1), fw(2);
 
-    // adjoint matrix fra T
-    Ad_T_ws = adjoint_matrix(T_ws);
-
-    // Bruker adjoint matrix for å finne F_s
-    F_s = Ad_T_ws.transpose() * F_w;
-
-    std::cout << F_s.transpose() << std::endl;
+    std::cout << wrench_s.transpose() << std::endl;
+    std::cout << wrench_w.transpose() << std::endl;
 }
 // ==============================================================
 
@@ -241,7 +235,7 @@ int main() {
     std::cout << screw_axis(v_a, v_b, 1).transpose() << std::endl;
     // ==============================================================
 
-    // 1 d)
+    // Task 1 d)
     // ==============================================================
     Eigen::Matrix4d T;
 
@@ -261,7 +255,49 @@ int main() {
 
     // Task 2 a)
     // ==============================================================
-    wrench();
+    Eigen::Vector3d ews{60, -60, 0};
+    Eigen::Vector3d fw{-30, 0, 0};
+    Eigen::Vector3d ms{0, 0, 2};
+
+    wrench(fw, ms, ews);
     // ==============================================================
+
+    // Task 2 b)
+    // ==============================================================
+    float N = 0;
+
+    Eigen::VectorXd Fh(6);
+    Eigen::VectorXd Fa(6);
+    Eigen::Vector3d wa{0, 0, 0};
+    Eigen::Vector3d va{-5, N, 0};
+    Eigen::Vector3d wh{0, 0, 0};
+    Eigen::Vector3d vh{0, -1, N};
+    Eigen::VectorXd Ff(6);
+    Eigen::MatrixXd Thf(4, 4);
+    Eigen::MatrixXd Taf(4, 4);
+
+    Fh << twist(wh, vh);
+    Fa << twist(wa, va);
+
+    Thf <<
+        1, 0, 0, -0.1,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1;
+
+    Taf <<
+        1, 0, 0, -0.25,
+    0, 0, 1, 0,
+    0, -1, 0, 0,
+    0, 0, 0, 1;
+
+    Ff = adjoint_matrix(Thf).transpose()*Fh + adjoint_matrix(Taf).transpose()*Fa;
+
+    std::cout << Ff.transpose() << std::endl;
+
+
+    // ==============================================================
+
+
     return 0;
 }
