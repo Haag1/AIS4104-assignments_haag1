@@ -88,6 +88,25 @@ Eigen::Matrix3d skew_symmetric(Eigen::Vector3d v) {
 
     return skew_symetric_matrix;
 }
+
+Eigen::Matrix3d rotation_matrix_from_axis_angle(const Eigen::Vector3d &axis, double radians)
+{
+    Eigen::Matrix3d matrix;
+    const double c_0 = std::cos(radians);
+    const double s_0 = std::sin(radians);
+    const double w_1 = axis(0);
+    const double w_2 = axis(1);
+    const double w_3 = axis(2);
+    // implement the necessary equations and functionality.
+
+    matrix <<
+        c_0 + w_1*w_1*(1 - c_0), w_1*w_2*(1 - c_0) - w_3*s_0, w_1*w_3*(1 - c_0) + w_2*s_0,
+    w_1*w_2*(1 - c_0) + w_3*s_0, c_0 + w_2*w_2*(1 - c_0), w_2*w_3*(1 - c_0) - w_1*s_0,
+    w_1*w_3*(1 - c_0) - w_2*s_0, w_2*w_3*(1 - c_0) + w_1*s_0, c_0 + w_3*w_3*(1 - c_0);
+
+
+    return matrix;
+}
 // =================================================================
 
 
@@ -189,8 +208,6 @@ Eigen::MatrixXd adjoint_matrix(const Eigen::Matrix4d &tf){
 // Task 1 e)
 // ==============================================================
 double cot(double x) {
-    x = x * deg_to_rad_const;
-
     return std::cos(x)/std::sin(x);
 }
 // ==============================================================
@@ -225,11 +242,7 @@ void wrench(Eigen::Vector3d fw, Eigen::Vector3d ms, Eigen::Vector3d ews) {
 // Task 3 a)
 // ==============================================================
 Eigen::Matrix3d matrix_exponential(const Eigen::Vector3d &w, double theta) {
-    Eigen::Matrix3d I;
-
-    I << 1, 0, 0,
-    0, 1, 0,
-    0, 0, 1;
+    Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
 
     return I + std::sin(theta)*skew_symmetric(w) + (1 - std::cos(theta))*skew_symmetric(w)*skew_symmetric(w);
 }
@@ -242,10 +255,102 @@ std::pair<Eigen::Vector3d, double> matrix_logarithm(const Eigen::Matrix3d &r) {
     double theta = 0;
     Eigen::Vector3d w = Eigen::Vector3d::Zero();
 
-    
+    // Bruker trace for å sjekke diagonalen til r
+    double tr_r = r.trace();
+
+    if (std::abs(tr_r + 1) < 1e-6) {
+        theta = M_PI;
+
+        if (r(2, 2) > 0){
+            w = 1/(std::sqrt(2*(1 + r(2, 2)))) * Eigen::Vector3d(r(0, 2), r(1, 2), 1 + r(2, 2));
+        } else if (r(1, 1) > 0) {
+            w = 1/(std::sqrt(2*(1 + r(1, 1)))) * Eigen::Vector3d(r(0, 1), 1 + r(1, 1), r(2, 1));
+        } else {
+            w = 1/(std::sqrt(2*(1 + r(0, 0)))) * Eigen::Vector3d(1 + r(0, 0), r(1, 0), r(2, 0));
+        }
+    } else {
+        theta = std::acos(1.0/2 * (tr_r - 1));
+        Eigen::Matrix3d w_skew = 1.0/(2*std::sin(theta))*(r - r.transpose());
+        w << w_skew(2, 1), w_skew(0, 2), w_skew(1, 0);
+    }
+    return {w, theta};
 }
 // ==============================================================
 
+
+// Task 3 c)
+// ==============================================================
+Eigen::Matrix4d matrix_exponential(const Eigen::Vector3d &w, const Eigen::Vector3d &v, double theta) {
+    Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+
+
+    Eigen::Matrix3d R = matrix_exponential(w, theta);
+    Eigen::Vector3d p = (I*theta + (1 - std::cos(theta))*skew_symmetric(w) + (theta - sin(theta))*skew_symmetric(w)*skew_symmetric(w))*v;
+
+
+    Eigen::Matrix4d T = transformation_matrix(R, p);
+
+    return T;
+}
+// ==============================================================
+
+
+// Task 3 d)
+// ==============================================================
+std::pair<Eigen::VectorXd, double> matrix_logarithm(const Eigen::Matrix4d &t) {
+    Eigen::Vector3d w = Eigen::Vector3d::Zero();
+    Eigen::Vector3d p = t.block<3, 1> (0, 3);
+    Eigen::Matrix3d R = t.block<3, 3> (0, 0);
+    Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+
+    Eigen::Vector3d v;
+    Eigen::VectorXd s(6);
+    double theta = 0;
+
+    if (R.isApprox(Eigen::Matrix3d::Identity())) {
+        w = Eigen::Vector3d::Zero();
+        v = p/p.norm();
+        theta = p.norm();
+    } else {
+        std::tie(w,theta) = matrix_logarithm(R);
+        Eigen::Matrix3d G = 1/theta*I - 1/2*skew_symmetric(w) + (1/theta - 1/2*cot(theta/2))*skew_symmetric(w)*skew_symmetric(w);
+        v = G.transpose() * p;
+    }
+
+    s << w(0), w(1), w(2), v(0), v(1), v(2);
+
+    return {s, theta};
+}
+// ==============================================================
+
+// Task 4 a)
+// ==============================================================
+void print_pose(const std::string &label, const Eigen::Matrix4d &tf) {
+    std::cout << label << std::endl;
+    std::cout << euler_zyx_from_rotation(tf.block<3, 3>(0, 0)) << std::endl;
+    std::cout << tf.block<3, 1>(3, 0) << std::endl;
+}
+// ==============================================================
+
+// Task 4 b)
+// ==============================================================
+Eigen::Matrix4d planar_3r_fk_transform(const std::vector<Eigen::Vector3d> &joint_positions) {
+
+    unsigned long length = joint_positions.size();
+
+    Eigen::Matrix4d T05 = Eigen::Matrix4d::Identity();
+
+    Eigen::Matrix4d M = Eigen::Matrix4d::Identity();
+    M(0, 3) = 10;
+
+    for (int i=0; i<length; i++) {
+        T05 *= matrix_exponential(T)*M
+    }
+}
+// ==============================================================
+
+
+// ==============================================================
 int main() {
     // 1 a)
     // ==============================================================
@@ -260,8 +365,6 @@ int main() {
     // ==============================================================
     Eigen::Vector3d v_a{1, 2, 3};
     Eigen::Vector3d v_b{4, 5, 6};
-    v_a = v_a.transpose();
-    v_b = v_b.transpose();
 
     std::cout << twist(v_a, v_b).transpose() << std::endl;
     // ==============================================================
@@ -286,7 +389,7 @@ int main() {
 
     // Task 1 e)
     // ==============================================================
-    std::cout << cot(30) << std::endl;
+    std::cout << cot(30*deg_to_rad_const) << std::endl;
     // ==============================================================
 
     // Task 2 a)
@@ -329,7 +432,10 @@ int main() {
 
     std::cout << Ff.transpose() << std::endl;
     // ==============================================================
+    std::vector<Eigen::Vector3d> joint_positions
+    {{0.0, 0.0, 0.0}, {90.0, 0.0, 0.0}, {0.0, 90.0, 0.0}, {0.0, 0.0, 90.0}, {10.0, -15.0, 2.75}};
 
 
+    planar_3r_fk_transform(joint_positions);
     return 0;
 }
