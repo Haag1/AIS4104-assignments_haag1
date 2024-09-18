@@ -334,18 +334,34 @@ void print_pose(const std::string &label, const Eigen::Matrix4d &tf) {
 
 // Task 4 b)
 // ==============================================================
-Eigen::Matrix4d planar_3r_fk_transform(const std::vector<Eigen::Vector3d> &joint_positions) {
-
-    unsigned long length = joint_positions.size();
-
-    Eigen::Matrix4d T05 = Eigen::Matrix4d::Identity();
+Eigen::Matrix4d planar_3r_fk_transform(const std::vector<Eigen::Vector3d> &joint_positions, const std::vector<float> &L) {
+    const unsigned long positionVectorLength = joint_positions.size();
 
     Eigen::Matrix4d M = Eigen::Matrix4d::Identity();
-    M(0, 3) = 10;
+    M(0, 3) = 10*3;
 
-    for (int i=0; i<length; i++) {
-        T05 *= matrix_exponential(T)*M
+    std::cout  << positionVectorLength << std::endl;
+
+    for (unsigned long i = positionVectorLength-1; i>0; i--){
+        Eigen::Matrix3d R = rotation_matrix_from_euler_zyx(joint_positions[i]);
+        Eigen::Vector3d p{L[i], 0, 0};
+        Eigen::Matrix4d T = transformation_matrix(R, p);
+        std::cout << "T" << std::endl;
+        std::cout << T << std::endl;
+
+        /*
+        auto [S, theta] = matrix_logarithm(T);
+        Eigen::Vector3d w = S.block<3, 1> (0, 0);
+        Eigen::Vector3d v = S.block<3, 1> (0, 0);
+        Eigen::Matrix3d w_skew = skew_symmetric(w);
+        Eigen::Matrix4d exponential = transformation_matrix(w_skew, v);
+        */
+        //std::cout << "Exponential" << std::endl;
+        //std::cout << exponential << std::endl;
+
     }
+
+    return M;
 }
 // ==============================================================
 
@@ -435,7 +451,9 @@ int main() {
     std::vector<Eigen::Vector3d> joint_positions
     {{0.0, 0.0, 0.0}, {90.0, 0.0, 0.0}, {0.0, 90.0, 0.0}, {0.0, 0.0, 90.0}, {10.0, -15.0, 2.75}};
 
+    std::vector<float> L{0, 10, 10, 10};
 
-    planar_3r_fk_transform(joint_positions);
+    Eigen::Matrix4d test = planar_3r_fk_transform(joint_positions, L);
+
     return 0;
 }
