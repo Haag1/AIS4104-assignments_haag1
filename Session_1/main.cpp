@@ -285,7 +285,7 @@ Eigen::Matrix4d matrix_exponential(const Eigen::Vector3d &w, const Eigen::Vector
 
 
     Eigen::Matrix3d R = matrix_exponential(w, theta);
-    Eigen::Vector3d p = (I*theta + (1 - std::cos(theta))*skew_symmetric(w) + (theta - sin(theta))*skew_symmetric(w)*skew_symmetric(w))*v;
+    Eigen::Vector3d p = (I*theta + (1 - std::cos(theta))*skew_symmetric(w) + (theta - std::sin(theta))*skew_symmetric(w)*skew_symmetric(w))*v;
 
 
     Eigen::Matrix4d T = transformation_matrix(R, p);
@@ -327,44 +327,72 @@ std::pair<Eigen::VectorXd, double> matrix_logarithm(const Eigen::Matrix4d &t) {
 // ==============================================================
 void print_pose(const std::string &label, const Eigen::Matrix4d &tf) {
     std::cout << label << std::endl;
-    std::cout << euler_zyx_from_rotation(tf.block<3, 3>(0, 0)) << std::endl;
-    std::cout << tf.block<3, 1>(3, 0) << std::endl;
+    std::cout << euler_zyx_from_rotation(tf.block<3, 3>(0, 0)).transpose()*rad_to_deg_const << std::endl;
+    std::cout << tf.block<3, 1>(0, 3).transpose() << std::endl;
+    std::cout << "\n" << std::endl;
 }
 // ==============================================================
 
 // Task 4 b)
 // ==============================================================
-Eigen::Matrix4d planar_3r_fk_transform(const std::vector<Eigen::Vector3d> &joint_positions, const std::vector<float> &L) {
+Eigen::Matrix4d planar_3r_fk_transform(const std::vector<Eigen::Vector3d> &joint_positions) {
     const unsigned long positionVectorLength = joint_positions.size();
 
-    Eigen::Matrix4d M = Eigen::Matrix4d::Identity();
-    M(0, 3) = 10*3;
+    Eigen::Vector3d p{10, 0, 0};
 
-    std::cout  << positionVectorLength << std::endl;
+    Eigen::Matrix4d T04;
 
-    for (unsigned long i = positionVectorLength-1; i>0; i--){
-        Eigen::Matrix3d R = rotation_matrix_from_euler_zyx(joint_positions[i]);
-        Eigen::Vector3d p{L[i], 0, 0};
-        Eigen::Matrix4d T = transformation_matrix(R, p);
-        std::cout << "T" << std::endl;
-        std::cout << T << std::endl;
+    for(int i = 0; i < positionVectorLength; i++) {
+        Eigen::Matrix3d R1 = rotate_z(joint_positions[i][0]*deg_to_rad_const);
+        Eigen::Matrix3d R2 = rotate_z(joint_positions[i][1]*deg_to_rad_const);
+        Eigen::Matrix3d R3 = rotate_z(joint_positions[i][2]*deg_to_rad_const);
+        Eigen::Matrix4d T01 = transformation_matrix(R1, {0, 0, 0});
+        Eigen::Matrix4d T12 = transformation_matrix(R2, p);
+        Eigen::Matrix4d T23 = transformation_matrix(R3, p);
+        Eigen::Matrix4d T34 = transformation_matrix(Eigen::Matrix3d::Identity(), p);
 
-        /*
-        auto [S, theta] = matrix_logarithm(T);
-        Eigen::Vector3d w = S.block<3, 1> (0, 0);
-        Eigen::Vector3d v = S.block<3, 1> (0, 0);
-        Eigen::Matrix3d w_skew = skew_symmetric(w);
-        Eigen::Matrix4d exponential = transformation_matrix(w_skew, v);
-        */
-        //std::cout << "Exponential" << std::endl;
-        //std::cout << exponential << std::endl;
-
+        Eigen::Matrix4d T04_temp = T01*T12*T23*T34;
+        print_pose("Angle and pos", T04_temp);
     }
-
-    return M;
+    return T04;
 }
 // ==============================================================
 
+// Task 4c)
+// ==============================================================
+Eigen::Matrix4d planar_3r_fk_screw(const std::vector<Eigen::Vector3d> &joint_positions) {
+    const unsigned long positionVectorLength = joint_positions.size();
+    const int L = 10;
+    Eigen::Matrix4d M = Eigen::Matrix4d::Identity();
+    M(0, 3) = 3*L;
+
+    for(int i = 0; i < positionVectorLength; i++) {
+        Eigen::Vector3d w1{0, 0, 1};
+        Eigen::Vector3d w2{0, 0, 1};
+        Eigen::Vector3d w3{0, 0, 1};
+
+        Eigen::Vector3d v1{0, 0, 0};
+        Eigen::Vector3d v2{0, -L, 0};
+        Eigen::Vector3d v3{0, -2*L, 0};
+
+
+        Eigen::Matrix4d e1 = matrix_exponential(w1, v1, joint_positions[i][0]*deg_to_rad_const);
+        Eigen::Matrix4d e2 = matrix_exponential(w2, v2, joint_positions[i][1]*deg_to_rad_const);
+        Eigen::Matrix4d e3 = matrix_exponential(w3, v3, joint_positions[i][2]*deg_to_rad_const);
+
+        Eigen::Matrix4d f4_temp = e1*e2*e3*M;
+
+        std::cout << "Hello" << std::endl;
+        std::cout << e1 << std::endl;
+        std::cout << e2 << std::endl;
+        std::cout << e3 << std::endl;
+
+
+        print_pose("Angle and pos", f4_temp);
+    }
+    return M;
+}
+// ==============================================================
 
 // ==============================================================
 int main() {
@@ -451,9 +479,13 @@ int main() {
     std::vector<Eigen::Vector3d> joint_positions
     {{0.0, 0.0, 0.0}, {90.0, 0.0, 0.0}, {0.0, 90.0, 0.0}, {0.0, 0.0, 90.0}, {10.0, -15.0, 2.75}};
 
-    std::vector<float> L{0, 10, 10, 10};
 
-    Eigen::Matrix4d test = planar_3r_fk_transform(joint_positions, L);
+    Eigen::Matrix4d test = planar_3r_fk_transform(joint_positions);
+
+    std::cout << test << std::endl;
+
+    // ==============================================================
+    test = planar_3r_fk_screw(joint_positions);
 
     return 0;
 }
