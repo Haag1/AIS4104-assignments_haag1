@@ -394,7 +394,102 @@ Eigen::Matrix4d planar_3r_fk_screw(const std::vector<Eigen::Vector3d> &joint_pos
 }
 // ==============================================================
 
+
+// Task 5a)
 // ==============================================================
+Eigen::Matrix4d ur3e_fk_screw(const std::vector<Eigen::VectorXd> &joint_positions) {
+    double L1 = 0.2435;
+    double L2 = 0.2132;
+    double W1 = 0.1315;
+    double W2 = 0.0921;
+    double H1 = 0.1518;
+    double H2 = -0.08535;
+
+    /*
+    double L1 = 0.425;
+    double L2 = 0.392;
+    double W1 = 0.109;
+    double W2 = 0.082;
+    double H1 = 0.089;
+    double H2 = -0.095;
+    */
+
+    std::vector<Eigen::Vector3d> all_omega{
+        {0, 0, 1}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 1, 0}};
+
+    std::vector<Eigen::Vector3d> all_v{
+        {0, 0, 0}, {-H1, 0, 0}, {-H1, 0, L1}, {-H1, 0, L1+L2}, {-W1, L1 + L2, 0}, {H2-H1, 0, L1+L2}};
+
+    Eigen::Matrix4d M;
+
+    M << -1, 0, 0, L1+L2,
+    0, 0, 1, W1+W2,
+    0, 1, 0, H1+H2,
+    0, 0, 0, 1;
+
+    for(int i = 0; i < joint_positions.size(); i++) {
+        Eigen::Matrix4d T1 = matrix_exponential(all_omega[0], all_v[0], joint_positions[i](0, 0)*deg_to_rad_const);
+        Eigen::Matrix4d T2 = matrix_exponential(all_omega[1], all_v[1], joint_positions[i](1, 0)*deg_to_rad_const);
+        Eigen::Matrix4d T3 = matrix_exponential(all_omega[2], all_v[2], joint_positions[i](2, 0)*deg_to_rad_const);
+        Eigen::Matrix4d T4 = matrix_exponential(all_omega[3], all_v[3], joint_positions[i](3, 0)*deg_to_rad_const);
+        Eigen::Matrix4d T5 = matrix_exponential(all_omega[4], all_v[4], joint_positions[i](4, 0)*deg_to_rad_const);
+        Eigen::Matrix4d T6 = matrix_exponential(all_omega[5], all_v[5], joint_positions[i](5, 0)*deg_to_rad_const);
+
+        Eigen::Matrix4d T = T1*T2*T3*T4*T5*T6*M;
+
+        print_pose("Ur3", T);
+    }
+
+
+    /*
+    Eigen::Matrix4d T2 = matrix_exponential(all_omega[1], all_v[1], -M_PI/2);
+    Eigen::Matrix4d T5 = matrix_exponential(all_omega[4], all_v[4], M_PI/2);
+    */
+
+    //Eigen::Matrix4d T = T2*T5*M;
+
+
+    return M;
+}
+// ==============================================================
+
+// Task 5b)
+// ==============================================================
+Eigen::Matrix4d ur3_fk_transform(const Eigen::VectorXd &joint_positions) {
+    double L1 = 0.2435;
+    double L2 = 0.2132;
+    double W1 = 0.1315;
+    double W2 = 0.0921;
+    double H1 = 0.1518;
+    double H2 = -0.08535;
+
+    Eigen::Matrix3d R01 = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d R12 = rotate_y(joint_positions[1]);
+    Eigen::Matrix3d R23 = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d R34 = rotate_y(joint_positions[3]);
+    Eigen::Matrix3d R45 = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d R56 = rotation_matrix_from_euler_zyx(Eigen::Vector3d{0, -M_PI, -M_PI/2});
+
+    Eigen::Vector3d p01{0, 0, H1};
+    Eigen::Vector3d p12{0, W1, 0};
+    Eigen::Vector3d p23{L1, 0, 0};
+    Eigen::Vector3d p34{L2, 0, 0};
+    Eigen::Vector3d p45{0, 0, H2};
+    Eigen::Vector3d p56{0, W2, 0};
+
+    Eigen::Matrix4d T01 = transformation_matrix(R01, p01);
+    Eigen::Matrix4d T12 = transformation_matrix(R12, p12);
+    Eigen::Matrix4d T23 = transformation_matrix(R23, p23);
+    Eigen::Matrix4d T34 = transformation_matrix(R34, p34);
+    Eigen::Matrix4d T45 = transformation_matrix(R45, p45);
+    Eigen::Matrix4d T56 = transformation_matrix(R56, p56);
+
+    Eigen::Matrix4d T06 = T01*T12*T23*T34*T45*T56;
+
+    return T06;
+}
+// ==============================================================
+
 int main() {
     // 1 a)
     // ==============================================================
@@ -486,6 +581,29 @@ int main() {
 
     // ==============================================================
     test = planar_3r_fk_screw(joint_positions);
+
+    Eigen::VectorXd j1(6);
+    Eigen::VectorXd j2(6);
+    Eigen::VectorXd j3(6);
+
+    j1 << 0, 0, 0, -90, 0, 0;
+    j2 << 0, -180, 0, 0, 0, 0;
+    j3 << 0, -90, 0, 0, 0, 0;
+
+
+    std::vector<Eigen::VectorXd> joint_positions_5{j1, j2, j3};
+
+    test = ur3e_fk_screw(joint_positions_5);
+
+
+    test = ur3_fk_transform(j1*deg_to_rad_const);
+    print_pose("transformation ur3", test);
+
+    test = ur3_fk_transform(j2*deg_to_rad_const);
+    print_pose("transformation ur3", test);
+
+    test = ur3_fk_transform(j3*deg_to_rad_const);
+    print_pose("transformation ur3", test);
 
     return 0;
 }
