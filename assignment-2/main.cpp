@@ -233,7 +233,11 @@ void wrench(Eigen::Vector3d fw, Eigen::Vector3d ms, Eigen::Vector3d ews) {
     mw = Rws.transpose() * ms;
     wrench_w << mw(0), mw(1), mw(2), fw(0), fw(1), fw(2);
 
+    std::cout << "Task 2a)" << std::endl;
+    std::cout << "s:" << std::endl;
     std::cout << wrench_s.transpose() << std::endl;
+
+    std::cout << "w:" << std::endl;
     std::cout << wrench_w.transpose() << std::endl;
 }
 // ==============================================================
@@ -352,6 +356,8 @@ Eigen::Matrix4d planar_3r_fk_transform(const std::vector<Eigen::Vector3d> &joint
         Eigen::Matrix4d T34 = transformation_matrix(Eigen::Matrix3d::Identity(), p);
 
         Eigen::Matrix4d T04_temp = T01*T12*T23*T34;
+
+        std::cout << "j" << i + 1 << ":" << std::endl;
         print_pose("Angle and pos", T04_temp);
     }
     return T04;
@@ -437,7 +443,8 @@ Eigen::Matrix4d ur3e_fk_screw(const std::vector<Eigen::VectorXd> &joint_position
 
         Eigen::Matrix4d T = T1*T2*T3*T4*T5*T6*M;
 
-        print_pose("Ur3", T);
+        std::cout << "j" << i+1 << ":" << std::endl;
+        print_pose("exponential Ur3", T);
     }
 
 
@@ -493,11 +500,13 @@ Eigen::Matrix4d ur3_fk_transform(const Eigen::VectorXd &joint_positions) {
 int main() {
     // 1 a)
     // ==============================================================
+    /*
     Eigen::Vector3d e = Eigen::Vector3d(60.0, 45.0, 30.0);
     Eigen::Matrix3d r = rotation_matrix_from_euler_zyx(e * deg_to_rad_const);
     Eigen::Vector3d ea = euler_zyx_from_rotation(r) * rad_to_deg_const;
     std::cout << e.transpose() << std::endl;
     std::cout << ea.transpose() << std::endl;
+
     // ==============================================================
 
     // 1 b)
@@ -507,6 +516,7 @@ int main() {
 
     std::cout << twist(v_a, v_b).transpose() << std::endl;
     // ==============================================================
+
 
     // 1 c)
     // ==============================================================
@@ -530,6 +540,8 @@ int main() {
     // ==============================================================
     std::cout << cot(30*deg_to_rad_const) << std::endl;
     // ==============================================================
+    */
+
 
     // Task 2 a)
     // ==============================================================
@@ -539,6 +551,7 @@ int main() {
 
     wrench(fw, ms, ews);
     // ==============================================================
+
 
     // Task 2 b)
     // ==============================================================
@@ -568,20 +581,25 @@ int main() {
     0, 0, 0, 1;
 
     Ff = adjoint_matrix(Thf).transpose()*Fh + adjoint_matrix(Taf).transpose()*Fa;
-
+    std::cout << " " << std::endl;
+    std::cout << "Task 2b)" << std::endl;
+    std::cout << "Ff" << std::endl;
     std::cout << Ff.transpose() << std::endl;
+    // ==============================================================
+
+
+    // Task 4b)
     // ==============================================================
     std::vector<Eigen::Vector3d> joint_positions
     {{0.0, 0.0, 0.0}, {90.0, 0.0, 0.0}, {0.0, 90.0, 0.0}, {0.0, 0.0, 90.0}, {10.0, -15.0, 2.75}};
 
-
+    std::cout << " " << std::endl;
+    std::cout << "Task 4a)" << std::endl;
     Eigen::Matrix4d test = planar_3r_fk_transform(joint_positions);
-
-    std::cout << test << std::endl;
-
     // ==============================================================
-    test = planar_3r_fk_screw(joint_positions);
 
+    // Task 5a)
+    // ==============================================================
     Eigen::VectorXd j1(6);
     Eigen::VectorXd j2(6);
     Eigen::VectorXd j3(6);
@@ -590,12 +608,15 @@ int main() {
     j2 << 0, -180, 0, 0, 0, 0;
     j3 << 0, -90, 0, 0, 0, 0;
 
+    const std::vector<Eigen::VectorXd> joint_positions_5{j1, j2, j3};
 
-    std::vector<Eigen::VectorXd> joint_positions_5{j1, j2, j3};
-
+    std::cout << "Task 5a)" << std::endl;
     test = ur3e_fk_screw(joint_positions_5);
+    // ==============================================================
 
-
+    // Task 5b)
+    // ==============================================================
+    std::cout << "Task 5b)" << std::endl;
     test = ur3_fk_transform(j1*deg_to_rad_const);
     print_pose("transformation ur3", test);
 
@@ -604,6 +625,6 @@ int main() {
 
     test = ur3_fk_transform(j3*deg_to_rad_const);
     print_pose("transformation ur3", test);
-
+    // ==============================================================
     return 0;
 }
