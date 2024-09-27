@@ -27,7 +27,7 @@ bool is_average_below_eps(const std::vector<double> &values, double eps = 10e-7,
     return check;
 }
 
-std::pair<Eigen::Vector4d, std::vector<Eigen::VectorXd>> ur3e_space_chain() {
+std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_space_chain() {
     double L1 = 0.2435;
     double L2 = 0.2132;
     double W1 = 0.1315;
@@ -56,7 +56,7 @@ Eigen::Matrix4d matrix_exponential(const Eigen::VectorXd &screw, double theta) {
     return math::matrix_exponential(screw.head<3>(), screw.tail<3>(), theta);
 }
 
-Eigen::Matrix4d ur3_body_fk(const Eigen::VectorXd &joint_positions) {
+Eigen::Matrix4d ur3_space_fk(const Eigen::VectorXd &joint_positions) {
     auto [m, space_screws] = ur3e_space_chain();
     Eigen::Matrix4d t06 = Eigen::Matrix4d::Identity();
 
@@ -66,13 +66,39 @@ Eigen::Matrix4d ur3_body_fk(const Eigen::VectorXd &joint_positions) {
     return t06*m;
 }
 
+std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_body_chain() {
+    double L1 = 0.2435;
+    double L2 = 0.2132;
+    double W1 = 0.1315;
+    double W2 = 0.0921;
+    double H1 = 0.1518;
+    double H2 = -0.08535;
+
+    Eigen::Matrix3d mr = math::rotate_y(-90.0 * math::deg_to_rad_const)
+        * math::rotate_x(-90.0 * math::deg_to_rad_const)
+        * math::rotate_z(-90 * math::deg_to_rad_const);
+
+    Eigen::Matrix4d m = math::transformation_matrix(mr, Eigen::Vector3d{L1 + L2, W1 + W2, H1 - H2});
+
+    std::vector<Eigen::VectorXd> screws{
+        math::screw_axis({0, 0, 0}, {0, 0, 1}, 0),
+        math::screw_axis({0, 0, H1}, {0, 1, 0}, 0),
+        math::screw_axis({L1, 0, H1}, {0, 1, 0}, 0),
+        math::screw_axis({L1 + L2, 0, H1}, {0, 1, 0}, 0),
+        math::screw_axis({L1 + L2, W1, 0}, {0, 0, -1}, 0),
+        math::screw_axis({L1 + L2, 0, H1 - H2}, {0, 1, 0}, 0)
+    };
+    return std::make_pair(m, screws);
+}
+
 void ur3e_test_fk()
 {
     std::cout << "Forward kinematics tests" << std::endl;
-    math::print_pose("First movement: ",
-        std_vector_to_eigen(std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0}));
+    math::print_pose("Hello A: ",
+        ur3_space_fk(std_vector_to_eigen(
+            std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
 
-    math::print_pose("Second movement: ",
+    math::print_pose("Hello B: ",
         ur3_body_fk(std_vector_to_eigen(std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0})));
     std::cout << std::endl;
 }
