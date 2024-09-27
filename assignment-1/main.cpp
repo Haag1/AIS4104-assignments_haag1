@@ -1,6 +1,8 @@
 #include <iostream>
 #include <Eigen/Dense>
 
+#include "../math/include/math/math.h"
+
 /*
 Eigen::Matrix3d rotate_x(double degrees)
 {
@@ -26,17 +28,6 @@ void example(double constant)
     std::cout << constant <<"*I: " << std::endl << constant * identity << std::endl << std::endl;
 }
 */
-
-// helper functions
-// ================================
-double deg_to_rad(double degrees) {
-    return degrees * 0.0174532925;
-}
-
-double rad_to_deg(double radians) {
-    return radians * 57.29578;
-}
-// ================================
 
 
 // Task 2.1
@@ -82,7 +73,7 @@ Eigen::Matrix3d rotation_matrix_from_frame_axes(const Eigen::Vector3d &x, const 
 Eigen::Matrix3d rotate_x(double degrees)
 {
     Eigen::Matrix3d matrix;
-    const double radians = deg_to_rad(degrees);
+    const double radians = degrees* math::deg_to_rad_const;
     // implement the necessary equations and functionality.
 
     matrix <<
@@ -96,7 +87,7 @@ Eigen::Matrix3d rotate_x(double degrees)
 Eigen::Matrix3d rotate_y(double degrees)
 {
     Eigen::Matrix3d matrix;
-    const double radians = deg_to_rad(degrees);
+    const double radians = degrees*math::deg_to_rad_const;
     // implement the necessary equations and functionality.
 
     matrix <<
@@ -110,7 +101,7 @@ Eigen::Matrix3d rotate_y(double degrees)
 Eigen::Matrix3d rotate_z(double degrees)
 {
     Eigen::Matrix3d matrix;
-    const double radians = deg_to_rad(degrees);
+    const double radians = degrees*math::deg_to_rad_const;
     // implement the necessary equations and functionality.
 
     matrix <<
@@ -124,7 +115,7 @@ Eigen::Matrix3d rotate_z(double degrees)
 Eigen::Matrix3d rotation_matrix_from_axis_angle(const Eigen::Vector3d &axis, double degrees)
 {
     Eigen::Matrix3d matrix;
-    const double radians = deg_to_rad(degrees);
+    const double radians = degrees*math::deg_to_rad_const;
     const double c_0 = std::cos(radians);
     const double s_0 = std::sin(radians);
     const double w_1 = axis(0);
@@ -276,7 +267,8 @@ int main()
     transformation_matrix_test();
 
     //c)
-    transform_vector();
+    math::print_hello();
+
 
     return 0;
 }

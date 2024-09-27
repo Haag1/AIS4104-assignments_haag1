@@ -1,9 +1,6 @@
 #include <iostream>
 #include <Eigen/Dense>
 
-const double deg_to_rad_const = 0.0174532925;
-const double rad_to_deg_const = 57.29578;
-
 // helper functions
 // =================================================================
 bool floatEquals(double a, double b) {
@@ -411,15 +408,6 @@ Eigen::Matrix4d ur3e_fk_screw(const std::vector<Eigen::VectorXd> &joint_position
     double H1 = 0.1518;
     double H2 = -0.08535;
 
-    /*
-    double L1 = 0.425;
-    double L2 = 0.392;
-    double W1 = 0.109;
-    double W2 = 0.082;
-    double H1 = 0.089;
-    double H2 = -0.095;
-    */
-
     std::vector<Eigen::Vector3d> all_omega{
         {0, 0, 1}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 1, 0}};
 
@@ -446,16 +434,6 @@ Eigen::Matrix4d ur3e_fk_screw(const std::vector<Eigen::VectorXd> &joint_position
         std::cout << "j" << i+1 << ":" << std::endl;
         print_pose("exponential Ur3", T);
     }
-
-
-    /*
-    Eigen::Matrix4d T2 = matrix_exponential(all_omega[1], all_v[1], -M_PI/2);
-    Eigen::Matrix4d T5 = matrix_exponential(all_omega[4], all_v[4], M_PI/2);
-    */
-
-    //Eigen::Matrix4d T = T2*T5*M;
-
-
     return M;
 }
 // ==============================================================
