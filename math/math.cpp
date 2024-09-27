@@ -16,7 +16,7 @@ namespace math {
         return skew_symetric_matrix;
     }
 
-    // -------------- Task 2.2 --------------
+    // -------------- 2.2 --------------
     Eigen::Matrix3d rotation_matrix_from_frame_axes(const Eigen::Vector3d &x, const Eigen::Vector3d &y,
     const Eigen::Vector3d &z)
     {
@@ -104,7 +104,7 @@ namespace math {
         return R_euler;
     }
 
-    // -------------- Task 2.3 --------------
+    // -------------- 2.3 --------------
     Eigen::Matrix4d transformation_matrix(const Eigen::Matrix3d &r, const Eigen::Vector3d &p)
     {
         Eigen::Matrix4d matrix;
@@ -117,5 +117,204 @@ namespace math {
         0, 0, 0, 1;
 
         return matrix;
+    }
+
+    // ============== From assignment 2 ==============
+    bool floatEquals(double a, double b) {
+        return std::abs(a - b) < 1e-6;
+    }
+
+    // -------------- 1. --------------
+    Eigen::Vector3d euler_zyx_from_rotation(const Eigen::Matrix3d &r) {
+
+        double a;
+        double b;
+        double c;
+
+        if(floatEquals(r(2, 0), -1.0)){
+            b = EIGEN_PI / 2.0;
+            a = 0;
+            c = std::atan2(r(0, 1), r(1, 1));
+        }
+        else if(floatEquals(r(2, 0), 1.0)) {
+            b = -EIGEN_PI / 2.0;
+            a = 0.0;
+            c = -std::atan2(r(0, 1), r(1, 1));
+        }
+        else{
+            b = std::atan2(-r(2, 0), std::sqrt(r(0, 0)*r(0, 0) + r(1, 0) * r(1, 0)));
+            a = std::atan2(r(1, 0), r(0, 0));
+            c = std::atan2(r(2, 1), r(2, 2));
+        }
+
+        return Eigen::Vector3d{a, b, c};
+    }
+
+    Eigen::VectorXd twist(const Eigen::Vector3d &w, const Eigen::Vector3d &v){
+        Eigen::VectorXd twist(6);
+
+        twist << w(0), w(1), w(2), v(0), v(1), v(2);
+
+        return twist;
+    }
+
+    Eigen::VectorXd screw_axis(const Eigen::Vector3d &q, const Eigen::Vector3d &s, double h) {
+        // Antar rotasjonshastighet på 1
+        Eigen::VectorXd screwAxis(6);
+
+        Eigen::Vector3d w = s;
+        Eigen::Vector3d v = -s.cross(q) + h*s;
+
+        screwAxis << w(0), w(1), w(2), v(0), v(1), v(2);
+        screwAxis = screwAxis.transpose();
+
+        return screwAxis;
+    }
+
+    Eigen::MatrixXd adjoint_matrix(const Eigen::Matrix4d &tf){
+        Eigen::MatrixXd adjoint(6, 6);
+        Eigen::Matrix3d pR;
+        Eigen::Matrix3d skewSymetric;
+        Eigen::Matrix3d R;
+        Eigen::Vector3d p;
+
+        p <<
+            tf(0, 3),
+        tf(1, 3),
+        tf(2, 3);
+
+
+        skewSymetric <<
+            0, -p(2), p(1),
+        p(2), 0, -p(0),
+        -p(1), p(0), 0;
+
+        R <<
+            tf(0, 0), tf(0, 1), tf(0, 2),
+        tf(1, 0), tf(1, 1), tf(1, 2),
+        tf(2, 0), tf(2, 1), tf(2, 2);
+
+        pR = skewSymetric*R;
+
+        adjoint <<
+            R(0, 0), R(0, 1), R(0, 2), 0, 0, 0,
+        R(1, 0), R(1, 1), R(1, 2), 0, 0, 0,
+        R(2, 0), R(2, 1), R(2, 2), 0, 0, 0,
+        pR(0, 0), pR(0, 1), pR(0, 2), R(0, 0), R(0, 1), R(0, 2),
+        pR(1, 0), pR(1, 1), pR(1, 2), R(1, 0), R(1, 1), R(1, 2),
+        pR(2, 0), pR(2, 1), pR(2, 2), R(2, 0), R(2, 1), R(2, 2);
+
+        return adjoint;
+    }
+
+    double cot(double x) {
+        return std::cos(x)/std::sin(x);
+    }
+
+    // -------------- 2. --------------
+    void wrench(Eigen::Vector3d fw, Eigen::Vector3d ms, Eigen::Vector3d ews) {
+        // print variables
+        Eigen::VectorXd wrench_w(6);
+        Eigen::VectorXd wrench_s(6);
+
+        // Equation variables
+        Eigen::Vector3d fs;
+        Eigen::Vector3d mw;
+        Eigen::Matrix3d Rws;
+
+        // fw = rws * fs
+        // fs = rws^-1 * fw
+        Rws = rotation_matrix_from_euler_zyx(ews * deg_to_rad_const);
+        fs = Rws * fw;
+        wrench_s << ms(0), ms(1), ms(2), fs(0), fs(1), fs(2);
+
+        mw = Rws.transpose() * ms;
+        wrench_w << mw(0), mw(1), mw(2), fw(0), fw(1), fw(2);
+
+        std::cout << "Task 2a)" << std::endl;
+        std::cout << "s:" << std::endl;
+        std::cout << wrench_s.transpose() << std::endl;
+
+        std::cout << "w:" << std::endl;
+        std::cout << wrench_w.transpose() << std::endl;
+    }
+
+    // -------------- 3. --------------
+
+    Eigen::Matrix3d matrix_exponential(const Eigen::Vector3d &w, double theta) {
+        Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+
+        return I + std::sin(theta)*skew_symmetric(w) + (1 - std::cos(theta))*skew_symmetric(w)*skew_symmetric(w);
+    }
+
+    std::pair<Eigen::Vector3d, double> matrix_logarithm(const Eigen::Matrix3d &r) {
+        double theta = 0;
+        Eigen::Vector3d w = Eigen::Vector3d::Zero();
+
+        // Bruker trace for å sjekke diagonalen til r
+        double tr_r = r.trace();
+
+        if (std::abs(tr_r + 1) < 1e-6) {
+            theta = M_PI;
+
+            if (r(2, 2) > 0){
+                w = 1/(std::sqrt(2*(1 + r(2, 2)))) * Eigen::Vector3d(r(0, 2), r(1, 2), 1 + r(2, 2));
+            } else if (r(1, 1) > 0) {
+                w = 1/(std::sqrt(2*(1 + r(1, 1)))) * Eigen::Vector3d(r(0, 1), 1 + r(1, 1), r(2, 1));
+            } else {
+                w = 1/(std::sqrt(2*(1 + r(0, 0)))) * Eigen::Vector3d(1 + r(0, 0), r(1, 0), r(2, 0));
+            }
+        } else {
+            theta = std::acos(1.0/2 * (tr_r - 1));
+            Eigen::Matrix3d w_skew = 1.0/(2*std::sin(theta))*(r - r.transpose());
+            w << w_skew(2, 1), w_skew(0, 2), w_skew(1, 0);
+        }
+        return {w, theta};
+    }
+
+    Eigen::Matrix4d matrix_exponential(const Eigen::Vector3d &w, const Eigen::Vector3d &v, double theta) {
+        Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+
+
+        Eigen::Matrix3d R = matrix_exponential(w, theta);
+        Eigen::Vector3d p = (I*theta + (1 - std::cos(theta))*skew_symmetric(w) + (theta - std::sin(theta))*skew_symmetric(w)*skew_symmetric(w))*v;
+
+
+        Eigen::Matrix4d T = transformation_matrix(R, p);
+
+        return T;
+    }
+
+    std::pair<Eigen::VectorXd, double> matrix_logarithm(const Eigen::Matrix4d &t) {
+        Eigen::Vector3d w = Eigen::Vector3d::Zero();
+        Eigen::Vector3d p = t.block<3, 1> (0, 3);
+        Eigen::Matrix3d R = t.block<3, 3> (0, 0);
+        Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+
+        Eigen::Vector3d v;
+        Eigen::VectorXd s(6);
+        double theta = 0;
+
+        if (R.isApprox(Eigen::Matrix3d::Identity())) {
+            w = Eigen::Vector3d::Zero();
+            v = p/p.norm();
+            theta = p.norm();
+        } else {
+            std::tie(w,theta) = matrix_logarithm(R);
+            Eigen::Matrix3d G = 1/theta*I - 1/2*skew_symmetric(w) + (1/theta - 1/2*cot(theta/2))*skew_symmetric(w)*skew_symmetric(w);
+            v = G.transpose() * p;
+        }
+
+        s << w(0), w(1), w(2), v(0), v(1), v(2);
+
+        return {s, theta};
+    }
+
+    // -------------- 4. --------------
+    void print_pose(const std::string &label, const Eigen::Matrix4d &tf) {
+        std::cout << label << std::endl;
+        std::cout << euler_zyx_from_rotation(tf.block<3, 3>(0, 0)).transpose()*rad_to_deg_const << std::endl;
+        std::cout << tf.block<3, 1>(0, 3).transpose() << std::endl;
+        std::cout << "\n" << std::endl;
     }
 }
