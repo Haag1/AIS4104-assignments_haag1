@@ -54,6 +54,18 @@ namespace math {
     Eigen::Matrix4d matrix_exponential(const Eigen::Vector3d &w, const Eigen::Vector3d &v, double theta);
 
     std::pair<Eigen::VectorXd, double> matrix_logarithm(const Eigen::Matrix4d &t);
+
+    // -------------- 4. --------------
+    void print_pose(const std::string &label, const Eigen::Matrix4d &tf);
+
+    Eigen::Matrix4d planar_3r_fk_transform(const std::vector<Eigen::Vector3d> &joint_positions);
+
+    Eigen::Matrix4d planar_3r_fk_screw(const std::vector<Eigen::Vector3d> &joint_positions);
+
+    // -------------- 5. --------------
+    Eigen::Matrix4d ur3e_fk_screw(const std::vector<Eigen::VectorXd> &joint_positions);
+
+    Eigen::Matrix4d ur3_fk_transform(const Eigen::VectorXd &joint_positions);
 }
 
 #endif //MATH_H
