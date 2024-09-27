@@ -37,7 +37,7 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_space_chain() {
 
     Eigen::Matrix3d mr = math::rotate_y(-90.0 * math::deg_to_rad_const)
         * math::rotate_x(-90.0 * math::deg_to_rad_const)
-        * math::rotate_z(-90 * math::deg_to_rad_const);
+        * math::rotate_z(-90.0 * math::deg_to_rad_const);
 
     Eigen::Matrix4d m = math::transformation_matrix(mr, Eigen::Vector3d{L1 + L2, W1 + W2, H1 - H2});
 
@@ -76,7 +76,7 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_body_chain() {
 
     Eigen::Matrix3d mr = math::rotate_y(-90.0 * math::deg_to_rad_const)
         * math::rotate_x(-90.0 * math::deg_to_rad_const)
-        * math::rotate_z(-90 * math::deg_to_rad_const);
+        * math::rotate_z(-90.0 * math::deg_to_rad_const);
 
     Eigen::Matrix4d m = math::transformation_matrix(mr, Eigen::Vector3d{L1 + L2, W1 + W2, H1 - H2});
 
@@ -94,13 +94,9 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_body_chain() {
 void ur3e_test_fk()
 {
     std::cout << "Forward kinematics tests" << std::endl;
-    math::print_pose("Hello A: ",
+    math::print_pose("space transformation one: ",
         ur3_space_fk(std_vector_to_eigen(
             std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
-
-    math::print_pose("Hello B: ",
-        ur3_body_fk(std_vector_to_eigen(std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0})));
-    std::cout << std::endl;
 }
 
 
