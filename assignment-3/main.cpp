@@ -149,13 +149,88 @@ void ur3e_test_fk()
 }
 
 // ===================================== Task 2 b) =====================================
-std::pair<uint32_t, double> newton_raphson_root_find(const std::function<double(double)> &tf,
-    double x_0, double gamma = 0.1, doublle dx_0 = 0.5, double eps = 10e-7) {
-    skew_v = std::log(tf.)
+std::pair<uint32_t, double> newton_raphson_root_find(const std::function<double(double)> &f,
+    double x_0, double dx_0 = 0.5, double eps = 10e-7) {
+    int max_iterations = 1000;
+    int iteration_count = 0;
+    double a_n = 0;
+    double x_n = x_0;
+
+    while(iteration_count < max_iterations) {
+        a_n = (f(x_n + dx_0) - f(x_n))/dx_0;
+        x_n = x_n - f(x_n)/a_n;
+
+        if(abs(f(x_n)) < eps) {
+            break;
+        }
+
+        std::cout << iteration_count << " - " << x_n << std::endl;
+        iteration_count++;
+    }
+
+    return std::pair(iteration_count, x_n);
+}
+
+std::pair<uint32_t, double> gradient_descent_root_find(const std::function<double(double)> &f,
+    double x_0, double gamma = 0.1, double dx_0 = 0.5, double eps = 10e-7) {
+    int max_iterations = 100;
+    int iteration_count = 0;
+    double a_n = 0;
+    double x_n = x_0;
+    double solution_candidate = 0;
+    double best_solution_error = 100000;
+
+    while(iteration_count < max_iterations) {
+        a_n = (f(x_n + dx_0) - f(x_n))/dx_0;
+        x_n = x_n - gamma*a_n;
+
+        if(abs(f(x_n)) < eps) {
+            solution_candidate = x_n;
+            break;
+        }
+        if(best_solution_error > abs(f(x_n))) {
+            best_solution_error = f(x_n);
+            solution_candidate = x_n;
+        }
+
+        std::cout << iteration_count << " - " << f(x_n) << std::endl;
+        iteration_count++;
+    }
+
+    return std::pair(iteration_count, solution_candidate);
+
+}
+
+
+void test_newton_raphson_root_find(const std::function<double(double)> &f, double x0)
+{
+    auto [iterations, x_hat] = newton_raphson_root_find(f, x0);
+    std::cout << "NR root f, x0=" << x0 << " -> it=" << iterations << " x=" << x_hat << " f(x)=" <<
+        f(x_hat) << std::endl;
+}
+
+void test_gradient_descent_root_find(const std::function<double(double)> &f, double x0)
+{
+    auto [iterations, x_hat] = gradient_descent_root_find(f, x0);
+    std::cout << "GD root f, x0=" << x0 << " -> it=" << iterations << " x=" << x_hat << " f(x)=" <<
+        f(x_hat) << std::endl;
+}
+
+void test_root_find()
+{
+    std::cout << "Root finding tests" << std::endl;
+
+    auto f1 = [](double x)
+    {
+        return (x - 3.0) * (x - 3.0) - 1.0;
+    };
+    test_newton_raphson_root_find(f1, -20);
+    test_gradient_descent_root_find(f1, -20);
 }
 
 
 int main(){
     ur3e_test_fk();
+    test_root_find();
     return 0;
  }
