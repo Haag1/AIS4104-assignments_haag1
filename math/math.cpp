@@ -32,7 +32,7 @@ namespace math {
     Eigen::Matrix3d rotate_x(double degrees)
     {
         Eigen::Matrix3d matrix;
-        const double radians = degrees* math::deg_to_rad_const;
+        const double radians = degrees*deg_to_rad_const;
         // implement the necessary equations and functionality.
 
         matrix <<
@@ -45,7 +45,7 @@ namespace math {
     Eigen::Matrix3d rotate_y(double degrees)
     {
         Eigen::Matrix3d matrix;
-        const double radians = degrees*math::deg_to_rad_const;
+        const double radians = degrees*deg_to_rad_const;
         // implement the necessary equations and functionality.
 
         matrix <<
@@ -58,7 +58,7 @@ namespace math {
     Eigen::Matrix3d rotate_z(double degrees)
     {
         Eigen::Matrix3d matrix;
-        const double radians = degrees*math::deg_to_rad_const;
+        const double radians = degrees*deg_to_rad_const;
         // implement the necessary equations and functionality.
 
         matrix <<
@@ -279,8 +279,13 @@ namespace math {
         Eigen::Matrix3d R = matrix_exponential(w, theta);
         Eigen::Vector3d p = (I*theta + (1 - std::cos(theta))*skew_symmetric(w) + (theta - std::sin(theta))*skew_symmetric(w)*skew_symmetric(w))*v;
 
+        Eigen::Matrix4d T;
 
-        Eigen::Matrix4d T = transformation_matrix(R, p);
+        if(w.norm() == 1) {
+            T = transformation_matrix(R, p);
+        } else {
+            T = transformation_matrix(I, v);
+        }
 
         return T;
     }
@@ -313,8 +318,8 @@ namespace math {
     // -------------- 4. --------------
     void print_pose(const std::string &label, const Eigen::Matrix4d &tf) {
         std::cout << label << std::endl;
-        std::cout << euler_zyx_from_rotation(tf.block<3, 3>(0, 0)).transpose()*rad_to_deg_const << std::endl;
-        std::cout << tf.block<3, 1>(0, 3).transpose() << std::endl;
+        std::cout << "angle: " << euler_zyx_from_rotation(tf.block<3, 3>(0, 0)).transpose()*rad_to_deg_const << std::endl;
+        std::cout << "Pos: " << tf.block<3, 1>(0, 3).transpose() << std::endl;
         std::cout << "\n" << std::endl;
     }
 

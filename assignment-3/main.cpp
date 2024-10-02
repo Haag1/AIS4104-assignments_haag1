@@ -1,9 +1,11 @@
 #include <iostream>
+#include <functional>
 #include <numeric>
 #include <Eigen/Dense>
 #include "../math/include/math/math.h"
 
 
+// ===================================== Task 1 b) =====================================
 Eigen::VectorXd std_vector_to_eigen(const std::vector<double> &v) {
 
     Eigen::VectorXd r(v.size());
@@ -33,11 +35,11 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_space_chain() {
     double W1 = 0.1315;
     double W2 = 0.0921;
     double H1 = 0.1518;
-    double H2 = -0.08535;
+    double H2 = 0.08535;
 
-    Eigen::Matrix3d mr = math::rotate_y(-90.0 * math::deg_to_rad_const)
-        * math::rotate_x(-90.0 * math::deg_to_rad_const)
-        * math::rotate_z(-90.0 * math::deg_to_rad_const);
+    Eigen::Matrix3d mr = math::rotate_y(-90.0)
+        * math::rotate_x(-90.0)
+        * math::rotate_z(-90.0);
 
     Eigen::Matrix4d m = math::transformation_matrix(mr, Eigen::Vector3d{L1 + L2, W1 + W2, H1 - H2});
 
@@ -49,6 +51,7 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_space_chain() {
         math::screw_axis({L1 + L2, W1, 0}, {0, 0, -1}, 0),
         math::screw_axis({L1 + L2, 0, H1 - H2}, {0, 1, 0}, 0)
     };
+
     return std::make_pair(m, screws);
 }
 
@@ -63,6 +66,7 @@ Eigen::Matrix4d ur3_space_fk(const Eigen::VectorXd &joint_positions) {
     for(int i = 0; i < joint_positions.size(); i++) {
         t06 *= matrix_exponential(space_screws[i], joint_positions[i]);
     }
+
     return t06*m;
 }
 
@@ -72,11 +76,11 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_body_chain() {
     double W1 = 0.1315;
     double W2 = 0.0921;
     double H1 = 0.1518;
-    double H2 = -0.08535;
+    double H2 = 0.08535;
 
-    Eigen::Matrix3d mr = math::rotate_y(-90.0 * math::deg_to_rad_const)
-        * math::rotate_x(-90.0 * math::deg_to_rad_const)
-        * math::rotate_z(-90.0 * math::deg_to_rad_const);
+    Eigen::Matrix3d mr = math::rotate_y(-90.0)
+        * math::rotate_x(-90.0)
+        * math::rotate_z(-90.0);
 
     Eigen::Matrix4d m = math::transformation_matrix(mr, Eigen::Vector3d{L1 + L2, W1 + W2, H1 - H2});
 
@@ -88,7 +92,28 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_body_chain() {
         math::screw_axis({L1 + L2, W1, 0}, {0, 0, -1}, 0),
         math::screw_axis({L1 + L2, 0, H1 - H2}, {0, 1, 0}, 0)
     };
-    return std::make_pair(m, screws);
+
+    std::vector<Eigen::VectorXd> beta{
+        math::adjoint_matrix(m.inverse())*screws[0],
+        math::adjoint_matrix(m.inverse())*screws[1],
+        math::adjoint_matrix(m.inverse())*screws[2],
+        math::adjoint_matrix(m.inverse())*screws[3],
+        math::adjoint_matrix(m.inverse())*screws[4],
+        math::adjoint_matrix(m.inverse())*screws[5]
+    };
+
+    return std::make_pair(m, beta);
+}
+
+Eigen::Matrix4d ur3_body_fk(const Eigen::VectorXd &joint_positions) {
+    auto [m, beta] = ur3e_body_chain();
+    Eigen::Matrix4d t06 = Eigen::Matrix4d::Identity();
+
+    for(int i = 0; i < joint_positions.size(); i++) {
+        t06 *= matrix_exponential(beta[i], joint_positions[i]);
+    }
+
+    return m*t06;
 }
 
 void ur3e_test_fk()
@@ -97,6 +122,36 @@ void ur3e_test_fk()
     math::print_pose("space transformation one: ",
         ur3_space_fk(std_vector_to_eigen(
             std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
+    math::print_pose("Body transformation one: ",
+        ur3_body_fk(std_vector_to_eigen(
+            std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
+
+    math::print_pose("space transformation two: ",
+        ur3_space_fk(std_vector_to_eigen(
+            std::vector<double>{0.0, 0.0, 0.0, -90.0, 0.0, 0.0})*math::deg_to_rad_const));
+    math::print_pose("Body transformation two: ",
+        ur3_body_fk(std_vector_to_eigen(
+            std::vector<double>{0.0, 0.0, 0.0, -90.0, 0.0, 0.0})*math::deg_to_rad_const));
+
+    math::print_pose("space transformation three: ",
+        ur3_space_fk(std_vector_to_eigen(
+            std::vector<double>{0.0, 0.0, -180.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
+    math::print_pose("Body transformation three: ",
+        ur3_body_fk(std_vector_to_eigen(
+            std::vector<double>{0.0, 0.0, -180.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
+
+    math::print_pose("space transformation four: ",
+        ur3_space_fk(std_vector_to_eigen(
+            std::vector<double>{0.0, 0.0, -90.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
+    math::print_pose("Body transformation four: ",
+        ur3_body_fk(std_vector_to_eigen(
+            std::vector<double>{0.0, 0.0, -90.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
+}
+
+// ===================================== Task 2 b) =====================================
+std::pair<uint32_t, double> newton_raphson_root_find(const std::function<double(double)> &tf,
+    double x_0, double gamma = 0.1, doublle dx_0 = 0.5, double eps = 10e-7) {
+    skew_v = std::log(tf.)
 }
 
 
