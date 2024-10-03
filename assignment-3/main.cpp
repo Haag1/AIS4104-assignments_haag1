@@ -5,7 +5,7 @@
 #include "../math/include/math/math.h"
 
 
-// ===================================== Task 1 b) =====================================
+// ===================================== Task 1) =====================================
 Eigen::VectorXd std_vector_to_eigen(const std::vector<double> &v) {
 
     Eigen::VectorXd r(v.size());
@@ -148,7 +148,7 @@ void ur3e_test_fk()
             std::vector<double>{0.0, 0.0, -90.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
 }
 
-// ===================================== Task 2 b) =====================================
+// ===================================== Task 2) =====================================
 std::pair<uint32_t, double> newton_raphson_root_find(const std::function<double(double)> &f,
     double x_0, double dx_0 = 0.5, double eps = 10e-7) {
     int max_iterations = 1000;
@@ -164,7 +164,7 @@ std::pair<uint32_t, double> newton_raphson_root_find(const std::function<double(
             break;
         }
 
-        std::cout << iteration_count << " - " << x_n << std::endl;
+        // std::cout << iteration_count << " - " << x_n << std::endl;
         iteration_count++;
     }
 
@@ -193,7 +193,7 @@ std::pair<uint32_t, double> gradient_descent_root_find(const std::function<doubl
             solution_candidate = x_n;
         }
 
-        std::cout << iteration_count << " - " << f(x_n) << std::endl;
+        // std::cout << iteration_count << " - " << f(x_n) << std::endl;
         iteration_count++;
     }
 
@@ -229,8 +229,73 @@ void test_root_find()
 }
 
 
+// ===================================== Task 3) =====================================
+Eigen::MatrixXd ur3e_space_jacobian(const Eigen::VectorXd &current_joint_positions) {
+    auto[M, screws] = ur3e_space_chain();
+
+    Eigen::Matrix4d matrix_exponential_products = Eigen::Matrix4d::Identity();
+    Eigen::MatrixXd Js(6, 6);
+
+    Js.col(0) = screws[0];
+
+    for (int i = 1; i < 6; i++) {
+        Eigen::Vector3d w = screws[i-1].block<3, 1>(0, 0);
+        Eigen::Vector3d v = screws[i-1].block<3, 1>(3, 0);
+        matrix_exponential_products *= math::matrix_exponential(w, v, current_joint_positions[i-1]);
+
+        Js.col(i) = math::adjoint_matrix(matrix_exponential_products)*screws[i];
+    }
+
+    return Js;
+}
+
+Eigen::MatrixXd ur3e_body_jacobian(const Eigen::VectorXd &current_joint_positions) {
+    auto[M, screws] = ur3e_body_chain();
+
+    Eigen::Matrix4d matrix_exponential_products = Eigen::Matrix4d::Identity();
+    Eigen::MatrixXd Js(6, 6);
+
+    Js.col(5) =screws[5];
+
+    for (int i = 4; i >= 0; i--) {
+        Eigen::Vector3d w = screws[i+1].block<3, 1>(0, 0);
+        Eigen::Vector3d v = screws[i+1].block<3, 1>(3, 0);
+        matrix_exponential_products *= math::matrix_exponential(w, v, current_joint_positions[i+1]);
+
+        Js.col(i) = math::adjoint_matrix(-matrix_exponential_products)*screws[i];
+    }
+
+    return Js;
+}
+
+void ur3e_test_jacobian(const Eigen::VectorXd &joint_positions){
+    Eigen::Matrix4d tsb = ur3_body_fk(joint_positions);
+    auto [m, space_screws] = ur3e_space_chain();
+    Eigen::MatrixXd jb = ur3e_body_jacobian(joint_positions);
+    Eigen::MatrixXd js = ur3e_space_jacobian(joint_positions);
+    Eigen::MatrixXd ad_tsb = math::adjoint_matrix(tsb);
+    Eigen::MatrixXd ad_tbs = math::adjoint_matrix(tsb.inverse());
+
+    std::cout << "Jb: " << std::endl << jb << std::endl << "Ad_tbs*Js:" <<
+        std::endl << ad_tbs * js << std::endl << std::endl;
+    std::cout << "Js: " << std::endl << js << std::endl << "Ad_tsb*Jb:" <<
+        std::endl << ad_tsb * jb << std::endl << std::endl;
+    std::cout << "d Jb: " << std::endl << jb - ad_tbs * js << std::endl << std::endl;
+    std::cout << "d Js: " << std::endl << js - ad_tsb * jb << std::endl << std::endl;
+}
+void ur3e_test_jacobian(){
+    std::cout << "Jacobian matrix tests" << std::endl;
+    ur3e_test_jacobian(std_vector_to_eigen(std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0})
+        * math::deg_to_rad_const);
+    ur3e_test_jacobian(std_vector_to_eigen(std::vector<double>{45.0, -20.0, 10.0, 2.5, 30.0, -50.0})
+        * math::deg_to_rad_const);
+}
+
+
+
 int main(){
     ur3e_test_fk();
     test_root_find();
+    ur3e_test_jacobian();
     return 0;
- }
+}
