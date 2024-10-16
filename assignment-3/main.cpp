@@ -76,7 +76,7 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_body_chain() {
     double W1 = 0.1315;
     double W2 = 0.0921;
     double H1 = 0.1518;
-    double H2 = 0.08535;
+    double H2 = -0.08535;
 
     Eigen::Matrix3d mr = math::rotate_y(-90.0)
         * math::rotate_x(-90.0)
@@ -263,7 +263,7 @@ Eigen::MatrixXd ur3e_body_jacobian(const Eigen::VectorXd &current_joint_position
         Eigen::Vector3d v = screws[i+1].block<3, 1>(3, 0);
         matrix_exponential_products *= math::matrix_exponential(w, v, current_joint_positions[i+1]);
 
-        Js.col(i) = math::adjoint_matrix(-matrix_exponential_products)*screws[i];
+        Js.col(i) = math::adjoint_matrix(matrix_exponential_products)*screws[i];
     }
 
     return Js;
@@ -293,22 +293,22 @@ void ur3e_test_jacobian(){
 }
 
 // ===================================== Task 4) =====================================
-/*
 std::pair<size_t, Eigen::VectorXd> ur3e_ik_body(const Eigen::Matrix4d &t_sd,
     const Eigen::VectorXd &current_joint_positions, double gamma = 1e-2, double v_e = 4e-3, double w_e = 4e-3) {
-    auto J = ur3e_body_jacobian(t_sd);
+    auto J = ur3e_body_jacobian(current_joint_positions);
 
     double sum_of_squares = 0;
     double current_changing_rate = 0;
     double largest_changing_rate = 0;
     int largest_changing_rate_index = 0;
 
-    // Find gradient from jacobian matrix
-    for(int i = 0; i < sizeof(J.row(0)); i++) {
+    // Find gradient of most change from jacobian matrix
+    for(int i = 0; i < J.row(0).size(); i++) {
         auto gradient = J.col(i);
+        sum_of_squares = 0;
 
-        for(int n = 0; n < sizeof(gradient); n++) {
-            sum_of_squares += gradient[n]*gradient[n];
+        for(int n = 0; n < gradient.size(); n++) {
+            sum_of_squares += gradient(n)*gradient(n);
         }
         current_changing_rate = std::sqrt(sum_of_squares);
 
@@ -319,22 +319,77 @@ std::pair<size_t, Eigen::VectorXd> ur3e_ik_body(const Eigen::Matrix4d &t_sd,
     }
 
     const auto gradient = J.col(largest_changing_rate_index);
-
     auto new_pos = current_joint_positions - gamma*gradient;
-
     auto t_sb = ur3_body_fk(new_pos);
-
     auto t_difference = t_sd - t_sb;
 
-
+    // check if t_difference is converged
+    /*
+    bool difference_is_zero = true;
+    for(int i = 0; i < t_difference.rows(); i++) {
+        for(int n = 0; n < t_difference.cols(); n++) {
+            if(!math::floatEquals(t_difference(i, n), 0)) {
+                difference_is_zero = false;
+                break;
+            }
+        }
+        if(difference_is_zero) {
+            break;
+        }
+    }
+    */
+    return std::make_pair(1.0, t_difference.block<3, 1>(0, t_difference.cols()-1));
 }
-*/
 
+void ur3e_ik_test_pose(const Eigen::Vector3d &pos, const Eigen::Vector3d &zyx, const Eigen::VectorXd &j0)
+{
+    std::cout << "Test from pose" << std::endl;
+    Eigen::Matrix4d t_sd = math::transformation_matrix(math::rotation_matrix_from_euler_zyx(zyx), pos);
+    auto [iterations, j_ik] = ur3e_ik_body(t_sd, j0);
+    Eigen::Matrix4d t_ik = ur3_body_fk(j_ik);
+    math::print_pose(" IK pose", t_ik);
+    math::print_pose("Desired pose", t_sd);
+    std::cout << "Converged after " << iterations << " iterations" << std::endl;
+    std::cout << "J_0: " << j0.transpose() * math::rad_to_deg_const << std::endl;
+    std::cout << "J_ik: " << j_ik.transpose() * math::rad_to_deg_const << std::endl << std::endl;
+}
+void ur3e_ik_test_configuration(const Eigen::VectorXd &joint_positions, const Eigen::VectorXd &j0)
+{
+    std::cout << "Test from configuration" << std::endl;
+    Eigen::Matrix4d t_sd = ur3_space_fk(joint_positions);
+    auto [iterations, j_ik] = ur3e_ik_body(t_sd, j0);
+    Eigen::Matrix4d t_ik = ur3_body_fk(j_ik);
+    math::print_pose(" IK pose", t_ik);
+    math::print_pose("Desired pose", t_sd);
+    std::cout << "Converged after " << iterations << " iterations" << std::endl;
+    std::cout << "J_0: " << j0.transpose() * math::rad_to_deg_const << std::endl;
+    std::cout << "J_d: " << joint_positions.transpose() * math::rad_to_deg_const << std::endl;
+    std::cout << "J_ik: " << j_ik.transpose() * math::rad_to_deg_const << std::endl << std::endl;
+}
+
+void ur3e_ik_test()
+{
+    Eigen::VectorXd j_t0 = std_vector_to_eigen(std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0})
+        * math::deg_to_rad_const;
+    Eigen::VectorXd j_t1 = std_vector_to_eigen(std::vector<double>{0.0, 0.0, -89.0, 0.0, 0.0, 0.0})
+        * math::deg_to_rad_const;
+    ur3e_ik_test_pose(Eigen::Vector3d{0.3289, 0.22315, 0.36505},
+        Eigen::Vector3d{0.0, 90.0, -90.0} * math::deg_to_rad_const, j_t0);
+    ur3e_ik_test_pose(Eigen::Vector3d{0.3289, 0.22315, 0.36505},
+        Eigen::Vector3d{0.0, 90.0, -90.0} * math::deg_to_rad_const, j_t1);
+    Eigen::VectorXd j_t2 = std_vector_to_eigen(std::vector<double>{50.0, -30.0, 20, 0.0, -30.0, 50.0})
+        * math::deg_to_rad_const;
+    Eigen::VectorXd j_d1 = std_vector_to_eigen(std::vector<double>{45.0, -20.0, 10.0, 2.5, 30.0, -50.0})
+        * math::deg_to_rad_const;
+    ur3e_ik_test_configuration(j_d1, j_t0);
+    ur3e_ik_test_configuration(j_d1, j_t2);
+}
 
 
 int main(){
     ur3e_test_fk();
     test_root_find();
     ur3e_test_jacobian();
+    ur3e_ik_test();
     return 0;
 }
