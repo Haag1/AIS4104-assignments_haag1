@@ -100,7 +100,7 @@ int main() {
     {{0.0, 0.0, 0.0}, {90.0, 0.0, 0.0}, {0.0, 90.0, 0.0}, {0.0, 0.0, 90.0}, {10.0, -15.0, 2.75}};
 
     std::cout << " " << std::endl;
-    std::cout << "Task 4a)" << std::endl;
+    std::cout << "Task 4b)" << std::endl;
     Eigen::Matrix4d test = math::planar_3r_fk_transform(joint_positions);
     // ==============================================================
 

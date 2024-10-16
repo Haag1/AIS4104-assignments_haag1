@@ -158,6 +158,7 @@ std::pair<uint32_t, double> newton_raphson_root_find(const std::function<double(
 
     while(iteration_count < max_iterations) {
         a_n = (f(x_n + dx_0) - f(x_n))/dx_0;
+
         x_n = x_n - f(x_n)/a_n;
 
         if(abs(f(x_n)) < eps) {
@@ -290,6 +291,44 @@ void ur3e_test_jacobian(){
     ur3e_test_jacobian(std_vector_to_eigen(std::vector<double>{45.0, -20.0, 10.0, 2.5, 30.0, -50.0})
         * math::deg_to_rad_const);
 }
+
+// ===================================== Task 4) =====================================
+/*
+std::pair<size_t, Eigen::VectorXd> ur3e_ik_body(const Eigen::Matrix4d &t_sd,
+    const Eigen::VectorXd &current_joint_positions, double gamma = 1e-2, double v_e = 4e-3, double w_e = 4e-3) {
+    auto J = ur3e_body_jacobian(t_sd);
+
+    double sum_of_squares = 0;
+    double current_changing_rate = 0;
+    double largest_changing_rate = 0;
+    int largest_changing_rate_index = 0;
+
+    // Find gradient from jacobian matrix
+    for(int i = 0; i < sizeof(J.row(0)); i++) {
+        auto gradient = J.col(i);
+
+        for(int n = 0; n < sizeof(gradient); n++) {
+            sum_of_squares += gradient[n]*gradient[n];
+        }
+        current_changing_rate = std::sqrt(sum_of_squares);
+
+        if(largest_changing_rate < current_changing_rate) {
+            largest_changing_rate = current_changing_rate;
+            largest_changing_rate_index = i;
+        }
+    }
+
+    const auto gradient = J.col(largest_changing_rate_index);
+
+    auto new_pos = current_joint_positions - gamma*gradient;
+
+    auto t_sb = ur3_body_fk(new_pos);
+
+    auto t_difference = t_sd - t_sb;
+
+
+}
+*/
 
 
 
