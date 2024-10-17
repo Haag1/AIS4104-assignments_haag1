@@ -76,7 +76,7 @@ std::pair<Eigen::Matrix4d, std::vector<Eigen::VectorXd>> ur3e_body_chain() {
     double W1 = 0.1315;
     double W2 = 0.0921;
     double H1 = 0.1518;
-    double H2 = -0.08535;
+    double H2 = 0.08535;
 
     Eigen::Matrix3d mr = math::rotate_y(-90.0)
         * math::rotate_x(-90.0)
@@ -146,6 +146,13 @@ void ur3e_test_fk()
     math::print_pose("Body transformation four: ",
         ur3_body_fk(std_vector_to_eigen(
             std::vector<double>{0.0, 0.0, -90.0, 0.0, 0.0, 0.0})*math::deg_to_rad_const));
+
+    math::print_pose("space transformation five: ",
+        ur3_space_fk(std_vector_to_eigen(
+            std::vector<double>{45.0, -20.0, 10.0, 2.5, 30.0, -50.0})*math::deg_to_rad_const));
+    math::print_pose("Body transformation five: ",
+        ur3_body_fk(std_vector_to_eigen(
+            std::vector<double>{45.0, -20.0, 10.0, 2.5, 30.0, -50.0})*math::deg_to_rad_const));
 }
 
 // ===================================== Task 2) =====================================
@@ -261,7 +268,7 @@ Eigen::MatrixXd ur3e_body_jacobian(const Eigen::VectorXd &current_joint_position
     for (int i = 4; i >= 0; i--) {
         Eigen::Vector3d w = screws[i+1].block<3, 1>(0, 0);
         Eigen::Vector3d v = screws[i+1].block<3, 1>(3, 0);
-        matrix_exponential_products *= math::matrix_exponential(w, v, current_joint_positions[i+1]);
+        matrix_exponential_products *= math::matrix_exponential(w, v, current_joint_positions[i+1]).inverse();
 
         Js.col(i) = math::adjoint_matrix(matrix_exponential_products)*screws[i];
     }
@@ -271,7 +278,7 @@ Eigen::MatrixXd ur3e_body_jacobian(const Eigen::VectorXd &current_joint_position
 
 void ur3e_test_jacobian(const Eigen::VectorXd &joint_positions){
     Eigen::Matrix4d tsb = ur3_body_fk(joint_positions);
-    auto [m, space_screws] = ur3e_space_chain();
+    //auto [m, space_screws] = ur3e_space_chain();
     Eigen::MatrixXd jb = ur3e_body_jacobian(joint_positions);
     Eigen::MatrixXd js = ur3e_space_jacobian(joint_positions);
     Eigen::MatrixXd ad_tsb = math::adjoint_matrix(tsb);
