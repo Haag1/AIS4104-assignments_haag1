@@ -302,50 +302,73 @@ void ur3e_test_jacobian(){
 // ===================================== Task 4) =====================================
 std::pair<size_t, Eigen::VectorXd> ur3e_ik_body(const Eigen::Matrix4d &t_sd,
     const Eigen::VectorXd &current_joint_positions, double gamma = 1e-2, double v_e = 4e-3, double w_e = 4e-3) {
-    auto J = ur3e_body_jacobian(current_joint_positions);
+    auto J = ur3e_space_jacobian(current_joint_positions);
+    auto t_difference = t_sd;
+    auto t_sb = t_sd;
+    auto new_pos = current_joint_positions;
+    auto gradient = current_joint_positions;
 
+
+    int max_loops = 1000;
+    int actual_loops = max_loops;
+    bool rotation_difference_is_zero = false;
+    bool position_difference_is_zero = false;
+    bool converged = false;
     double sum_of_squares = 0;
     double current_changing_rate = 0;
     double largest_changing_rate = 0;
     int largest_changing_rate_index = 0;
 
-    // Find gradient of most change from jacobian matrix
-    for(int i = 0; i < J.row(0).size(); i++) {
-        auto gradient = J.col(i);
+    for(int l = 0; l < max_loops; l++) {
+
         sum_of_squares = 0;
+        current_changing_rate = 0;
+        largest_changing_rate = 0;
+        largest_changing_rate_index = 0;
 
-        for(int n = 0; n < gradient.size(); n++) {
-            sum_of_squares += gradient(n)*gradient(n);
-        }
-        current_changing_rate = std::sqrt(sum_of_squares);
+        // Find gradient of most change from jacobian matrix
+        for(int i = 0; i < J.row(0).size(); i++) {
+            gradient = J.col(i);
+            sum_of_squares = 0;
 
-        if(largest_changing_rate < current_changing_rate) {
-            largest_changing_rate = current_changing_rate;
-            largest_changing_rate_index = i;
-        }
-    }
+            for(int n = 0; n < gradient.size(); n++) {
+                sum_of_squares += gradient(n)*gradient(n);
+            }
+            current_changing_rate = std::sqrt(sum_of_squares);
 
-    const auto gradient = J.col(largest_changing_rate_index);
-    auto new_pos = current_joint_positions - gamma*gradient;
-    auto t_sb = ur3_body_fk(new_pos);
-    auto t_difference = t_sd - t_sb;
-
-    // check if t_difference is converged
-    /*
-    bool difference_is_zero = true;
-    for(int i = 0; i < t_difference.rows(); i++) {
-        for(int n = 0; n < t_difference.cols(); n++) {
-            if(!math::floatEquals(t_difference(i, n), 0)) {
-                difference_is_zero = false;
-                break;
+            if(largest_changing_rate < current_changing_rate) {
+                largest_changing_rate = current_changing_rate;
+                largest_changing_rate_index = i;
             }
         }
-        if(difference_is_zero) {
+
+        gradient = J.col(largest_changing_rate_index);
+        new_pos = current_joint_positions - gamma*gradient;
+        t_sb = ur3_body_fk(new_pos);
+        t_difference = t_sd - t_sb;
+        J = ur3e_space_jacobian(new_pos);
+
+        // check if t_difference is converged
+        Eigen::Matrix3d R_difference = t_difference.block<3, 3>(0, 0);
+        Eigen::Vector3d v_difference = t_difference.block<3, 1>(0, 3);
+
+        // From chatGPT-4o
+        // ------------------------------------------
+        double position_error = v_difference.norm();
+        double rotation_error = std::acos((R_difference.trace() - 1) / 2); // Convert to angle
+
+        position_difference_is_zero = position_error < v_e;
+        rotation_difference_is_zero = rotation_error < w_e;
+        // ------------------------------------------
+
+        converged = position_difference_is_zero and rotation_difference_is_zero;
+
+        if(converged) {
+            actual_loops = l;
             break;
         }
     }
-    */
-    return std::make_pair(1.0, t_difference.block<3, 1>(0, t_difference.cols()-1));
+    return std::make_pair(actual_loops, t_difference.block<3, 1>(0, t_difference.cols()-1));
 }
 
 void ur3e_ik_test_pose(const Eigen::Vector3d &pos, const Eigen::Vector3d &zyx, const Eigen::VectorXd &j0)
