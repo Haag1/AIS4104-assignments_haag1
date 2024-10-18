@@ -181,22 +181,20 @@ std::pair<uint32_t, double> newton_raphson_root_find(const std::function<double(
 
 std::pair<uint32_t, double> gradient_descent_root_find(const std::function<double(double)> &f,
     double x_0, double gamma = 0.1, double dx_0 = 0.5, double eps = 10e-7) {
-    int max_iterations = 100;
+    int max_iterations = 1000;
     int iteration_count = 0;
     double a_n = 0;
     double x_n = x_0;
+    double error = 0;
     double solution_candidate = 0;
     double best_solution_error = 100000;
 
     while(iteration_count < max_iterations) {
         a_n = (f(x_n + dx_0) - f(x_n))/dx_0;
-        x_n = x_n - gamma*a_n;
+        error = x_n;
 
-        if(abs(f(x_n)) < eps) {
-            solution_candidate = x_n;
-            break;
-        }
-        if(best_solution_error > abs(f(x_n))) {
+        x_n = x_n - gamma*a_n*error;
+        if(abs(error) < eps) {
             best_solution_error = f(x_n);
             solution_candidate = x_n;
         }
@@ -301,56 +299,52 @@ void ur3e_test_jacobian(){
 
 // ===================================== Task 4) =====================================
 std::pair<size_t, Eigen::VectorXd> ur3e_ik_body(const Eigen::Matrix4d &t_sd,
-    const Eigen::VectorXd &current_joint_positions, double gamma = 8e-4, double v_e = 4e-3, double w_e = 4e-3) {
+    const Eigen::VectorXd &current_joint_positions, double gamma = 6e-2, double v_e = 4e-3, double w_e = 4e-3) {
 
     // Initialize parameters
     auto J = ur3e_body_jacobian(current_joint_positions);
-    auto velocity = t_sd;
-    auto t_sb = t_sd;
     auto new_pos = current_joint_positions;
-    int max_loops = 10000;
+    const int max_loops = 1000;
     int actual_loops = max_loops;
     bool angle_converged = false;
     bool position_converged = false;
     bool converged = false;
     Eigen::VectorXd screw_velocity(6);
-    double angular_error = 0;
     Eigen::VectorXd screw_error(6);
-
 
     for(int l = 0; l < max_loops; l++) {
         // New transformation matrix for current position
-        t_sb = ur3_body_fk(new_pos);
+        Eigen::Matrix4d t_sb = ur3_body_fk(new_pos);
 
-        Eigen::Matrix4d t_error = t_sb - t_sd;
-        std::pair<Eigen::VectorXd, double> error_logarithm_pair = math::matrix_logarithm(velocity);
+        // Calculate error position, and transform it in to a screw describing the error
+        Eigen::Matrix4d t_error = t_sd - t_sb;
+        std::pair<Eigen::VectorXd, double> error_logarithm_pair = math::matrix_logarithm(t_error);
         screw_error = error_logarithm_pair.first;
-        angular_error = error_logarithm_pair.second;
 
-        // Check if converged befor calculating new position
-        position_converged = screw_velocity.tail<3>().norm() < v_e;
-        angle_converged = angular_error < w_e;
+        // Check if converged before doing more gradient decent
+        position_converged = screw_error.tail<3>().norm() < v_e;
+        angle_converged = screw_error.head<3>().norm() < w_e;
 
         // converged if both position and twist pass the test
         converged = position_converged and angle_converged;
-
         if(converged) {
             actual_loops = l;
             break;
         }
 
-        // error from desired position
-        velocity = t_sd.inverse() * t_sb;
+        // Calculate end-effector velocity from error
+        Eigen::Matrix4d velocity = t_sd.inverse() * t_sb;
         std::pair<Eigen::VectorXd, double> velocity_logarithm_pair = math::matrix_logarithm(velocity);
         screw_velocity = velocity_logarithm_pair.first;
 
         // Create a Jacobien in body frame
         J = ur3e_body_jacobian(new_pos);
 
-        // calculate new joint angles from screw error and transpose of Jacobien
+        // calculate new joint angles from screw velocity and transpose of Jacobien
         new_pos = new_pos - gamma*J.transpose()*screw_velocity;
     }
-    std::cout << "Error at end:" << "\n" << screw_velocity.tail<3>() << std::endl;
+    std::cout << "Error at end:" << " " << screw_error.tail<3>().norm() << std::endl;
+    std::cout << "Error at end:" << " " << screw_error.head<3>().norm() << std::endl;
     return std::make_pair(actual_loops, new_pos);
 }
 
