@@ -301,74 +301,57 @@ void ur3e_test_jacobian(){
 
 // ===================================== Task 4) =====================================
 std::pair<size_t, Eigen::VectorXd> ur3e_ik_body(const Eigen::Matrix4d &t_sd,
-    const Eigen::VectorXd &current_joint_positions, double gamma = 1e-2, double v_e = 4e-3, double w_e = 4e-3) {
-    auto J = ur3e_space_jacobian(current_joint_positions);
-    auto t_difference = t_sd;
+    const Eigen::VectorXd &current_joint_positions, double gamma = 8e-4, double v_e = 4e-3, double w_e = 4e-3) {
+
+    // Initialize parameters
+    auto J = ur3e_body_jacobian(current_joint_positions);
+    auto velocity = t_sd;
     auto t_sb = t_sd;
     auto new_pos = current_joint_positions;
-    auto gradient = current_joint_positions;
-
-
-    int max_loops = 1000;
+    int max_loops = 10000;
     int actual_loops = max_loops;
-    bool rotation_difference_is_zero = false;
-    bool position_difference_is_zero = false;
+    bool angle_converged = false;
+    bool position_converged = false;
     bool converged = false;
-    double sum_of_squares = 0;
-    double current_changing_rate = 0;
-    double largest_changing_rate = 0;
-    int largest_changing_rate_index = 0;
+    Eigen::VectorXd screw_velocity(6);
+    double angular_error = 0;
+    Eigen::VectorXd screw_error(6);
+
 
     for(int l = 0; l < max_loops; l++) {
-
-        sum_of_squares = 0;
-        current_changing_rate = 0;
-        largest_changing_rate = 0;
-        largest_changing_rate_index = 0;
-
-        // Find gradient of most change from jacobian matrix
-        for(int i = 0; i < J.row(0).size(); i++) {
-            gradient = J.col(i);
-            sum_of_squares = 0;
-
-            for(int n = 0; n < gradient.size(); n++) {
-                sum_of_squares += gradient(n)*gradient(n);
-            }
-            current_changing_rate = std::sqrt(sum_of_squares);
-
-            if(largest_changing_rate < current_changing_rate) {
-                largest_changing_rate = current_changing_rate;
-                largest_changing_rate_index = i;
-            }
-        }
-
-        gradient = J.col(largest_changing_rate_index);
-        new_pos = current_joint_positions - gamma*gradient;
+        // New transformation matrix for current position
         t_sb = ur3_body_fk(new_pos);
-        t_difference = t_sd - t_sb;
-        J = ur3e_space_jacobian(new_pos);
 
-        // check if t_difference is converged
-        Eigen::Matrix3d R_difference = t_difference.block<3, 3>(0, 0);
-        Eigen::Vector3d v_difference = t_difference.block<3, 1>(0, 3);
+        Eigen::Matrix4d t_error = t_sb - t_sd;
+        std::pair<Eigen::VectorXd, double> error_logarithm_pair = math::matrix_logarithm(velocity);
+        screw_error = error_logarithm_pair.first;
+        angular_error = error_logarithm_pair.second;
 
-        // From chatGPT-4o
-        // ------------------------------------------
-        double position_error = v_difference.norm();
-        double rotation_error = std::acos((R_difference.trace() - 1) / 2); // Convert to angle
+        // Check if converged befor calculating new position
+        position_converged = screw_velocity.tail<3>().norm() < v_e;
+        angle_converged = angular_error < w_e;
 
-        position_difference_is_zero = position_error < v_e;
-        rotation_difference_is_zero = rotation_error < w_e;
-        // ------------------------------------------
-
-        converged = position_difference_is_zero and rotation_difference_is_zero;
+        // converged if both position and twist pass the test
+        converged = position_converged and angle_converged;
 
         if(converged) {
             actual_loops = l;
             break;
         }
+
+        // error from desired position
+        velocity = t_sd.inverse() * t_sb;
+        std::pair<Eigen::VectorXd, double> velocity_logarithm_pair = math::matrix_logarithm(velocity);
+        screw_velocity = velocity_logarithm_pair.first;
+
+        // Create a Jacobien in body frame
+        J = ur3e_body_jacobian(new_pos);
+
+        // calculate new joint angles from screw error and transpose of Jacobien
+        new_pos = new_pos - gamma*J.transpose()*screw_velocity;
     }
-    return std::make_pair(actual_loops, t_difference.block<3, 1>(0, t_difference.cols()-1));
+    std::cout << "Error at end:" << "\n" << screw_velocity.tail<3>() << std::endl;
+    return std::make_pair(actual_loops, new_pos);
 }
 
 void ur3e_ik_test_pose(const Eigen::Vector3d &pos, const Eigen::Vector3d &zyx, const Eigen::VectorXd &j0)
@@ -407,6 +390,7 @@ void ur3e_ik_test()
         Eigen::Vector3d{0.0, 90.0, -90.0} * math::deg_to_rad_const, j_t0);
     ur3e_ik_test_pose(Eigen::Vector3d{0.3289, 0.22315, 0.36505},
         Eigen::Vector3d{0.0, 90.0, -90.0} * math::deg_to_rad_const, j_t1);
+
     Eigen::VectorXd j_t2 = std_vector_to_eigen(std::vector<double>{50.0, -30.0, 20, 0.0, -30.0, 50.0})
         * math::deg_to_rad_const;
     Eigen::VectorXd j_d1 = std_vector_to_eigen(std::vector<double>{45.0, -20.0, 10.0, 2.5, 30.0, -50.0})
