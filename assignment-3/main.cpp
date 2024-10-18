@@ -186,7 +186,6 @@ std::pair<uint32_t, double> gradient_descent_root_find(const std::function<doubl
     double a_n = 0;
     double x_n = x_0;
     double error = 0;
-    double solution_candidate = 0;
 
     while(iteration_count < max_iterations) {
         a_n = dx_0/(f(x_n + dx_0) - f(x_n));
@@ -341,8 +340,8 @@ std::pair<size_t, Eigen::VectorXd> ur3e_ik_body(const Eigen::Matrix4d &t_sd,
         // calculate new joint angles from screw velocity and transpose of Jacobien
         new_pos = new_pos - gamma*J.transpose()*screw_velocity;
     }
-    std::cout << "Error at end:" << " " << screw_error.tail<3>().norm() << std::endl;
-    std::cout << "Error at end:" << " " << screw_error.head<3>().norm() << std::endl;
+    //std::cout << "Error at end:" << " " << screw_error.tail<3>().norm() << std::endl;
+    //std::cout << "Error at end:" << " " << screw_error.head<3>().norm() << std::endl;
     return std::make_pair(actual_loops, new_pos);
 }
 
@@ -395,7 +394,7 @@ void ur3e_ik_test()
 int main(){
     ur3e_test_fk();
     test_root_find();
-    //ur3e_test_jacobian();
-    //ur3e_ik_test();
+    ur3e_test_jacobian();
+    ur3e_ik_test();
     return 0;
 }
