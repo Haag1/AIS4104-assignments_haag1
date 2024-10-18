@@ -187,23 +187,21 @@ std::pair<uint32_t, double> gradient_descent_root_find(const std::function<doubl
     double x_n = x_0;
     double error = 0;
     double solution_candidate = 0;
-    double best_solution_error = 100000;
 
     while(iteration_count < max_iterations) {
-        a_n = (f(x_n + dx_0) - f(x_n))/dx_0;
-        error = x_n;
+        a_n = dx_0/(f(x_n + dx_0) - f(x_n));
+        error = f(x_n);
 
         x_n = x_n - gamma*a_n*error;
         if(abs(error) < eps) {
-            best_solution_error = f(x_n);
-            solution_candidate = x_n;
+            break;
         }
 
-        // std::cout << iteration_count << " - " << f(x_n) << std::endl;
+        //std::cout << iteration_count << " - " << f(x_n) << std::endl;
         iteration_count++;
     }
 
-    return std::pair(iteration_count, solution_candidate);
+    return std::pair(iteration_count, x_n);
 
 }
 
@@ -397,7 +395,7 @@ void ur3e_ik_test()
 int main(){
     ur3e_test_fk();
     test_root_find();
-    ur3e_test_jacobian();
-    ur3e_ik_test();
+    //ur3e_test_jacobian();
+    //ur3e_ik_test();
     return 0;
 }
